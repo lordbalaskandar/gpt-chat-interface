@@ -1,17 +1,14 @@
 import axios from 'axios';
-import https from 'https';
 
-const baseURL = "https://13.43.178.119";
-const API_KEY =
-  "2f4bf66aabfe9daa63025902bcf73060e20c3796b053cabf7989038a8263936c";
+const baseURL = process.env['URL'];
+const API_KEY = process.env['API_KEY']
 
 const api = axios.create({
-  baseURL, // replace with your API base URL
+  baseURL,
   headers: {
     'x-api-key': API_KEY,
     'Content-Type': 'application/json',
   },
-  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
 
 export default api;
