@@ -59,7 +59,7 @@ export default function ChatWindow() {
 
     const docId = matchDocumentId(inputText, documents);
     const isDocRelated = looksLikeDocQuery(inputText);
-    const nChunks = determineNumChunks(inputText);
+    const nChunks = determineNumChunks(inputText, messages.length);
     try {
       setIsTyping(true);
       if (docId || isDocRelated) {
