@@ -1,7 +1,7 @@
 import { Box, Paper, Typography, Avatar } from "@mui/material";
 import { SmartToy } from "@mui/icons-material";
 
-export default function Header() {
+export default function Header({online}: {online: boolean}) {
   return (
     <Paper
       elevation={3}
@@ -17,8 +17,7 @@ export default function Header() {
           <SmartToy />
         </Avatar>
         <Box>
-          <Typography variant="h6">LLM Calls: </Typography>
-          <Typography variant="h6">API Calls: </Typography>
+          <Typography variant="h6">{online ? "Online" : "Offline"}</Typography>
         </Box>
       </Box>
     </Paper>
