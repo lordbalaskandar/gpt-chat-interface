@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 
 const baseURL = "https://13.43.178.119";
 const API_KEY =
@@ -10,6 +11,7 @@ const api = axios.create({
     'x-api-key': API_KEY,
     'Content-Type': 'application/json',
   },
+  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
 
 export default api;

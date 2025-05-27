@@ -1,7 +1,8 @@
 import api from "@/api/axiosInstance";
-import { LLMContextualSearchVariables, LLMRegularQuestionVariables, SemanticQueryParams } from "@/types/interfaces";
-import { LLMResponse, LLMResponseWithContext, SemanticResult } from "@/types/types";
+import { SemanticQueryParams, SemanticResult, LLMResponseWithContext, LLMContextualSearchVariables, LLMResponse, LLMRegularQuestionVariables, Document} from "@/types/llm";
 import { useMutation, useQuery } from "@tanstack/react-query";
+
+const DEV_MODE = true;
 
 export function useGetAllDocumentInfo() {
   return useQuery<Document[]>({
@@ -37,7 +38,7 @@ export function useLLMContextualSearch() {
       chatHistory = [],
       documentIds,
       nChunks = 5,
-      developMode = false,
+      developMode = DEV_MODE,
     }) => {
       const params = new URLSearchParams({
         query,
@@ -59,7 +60,7 @@ export function useLLMContextualSearch() {
 
 export function useLLMRegularQuestion() {
   return useMutation<LLMResponse, unknown, LLMRegularQuestionVariables>({
-    mutationFn: async ({ query, chatHistory = [], developMode = false }) => {
+    mutationFn: async ({ query, chatHistory = [], developMode = DEV_MODE }) => {
       const params = new URLSearchParams({
         query,
         develop_mode: developMode.toString(),

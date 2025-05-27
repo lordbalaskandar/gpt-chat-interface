@@ -16,6 +16,22 @@ import {
   SmartToy as BotIcon,
 } from "@mui/icons-material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import Header from "./components/ui/header";
+import { Message } from "@/types/chat";
+import {
+  useGetAllDocumentInfo,
+  useLLMContextualSearch,
+  useLLMRegularQuestion,
+} from "./components/hooks/useLLM";
+import {
+  matchDocumentId,
+  looksLikeDocQuery,
+  determineNumChunks,
+} from "./components/utils/document-matcher";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Create QueryClient outside component
+const queryClient = new QueryClient();
 
 // Create a modern theme
 const theme = createTheme({
@@ -42,13 +58,20 @@ const theme = createTheme({
   },
 });
 
-const ChatWindow = () => {
-  const [messages, setMessages] = useState([
+// Separate the chat logic into its own component
+const ChatWindowInner = () => {
+  const { data: documents = [] } = useGetAllDocumentInfo();
+
+  const { mutateAsync: contextualSearch, isLoading: isContextualLoading } =
+    useLLMContextualSearch();
+
+  const { mutateAsync: regularQuestion, isLoading: isRegularLoading } =
+    useLLMRegularQuestion();
+
+  const [messages, setMessages] = useState<Message[]>([
     {
-      id: 1,
-      text: "Hello! How can I help you today?",
-      sender: "bot",
-      timestamp: new Date(),
+      content: "Hello! How can I help you today?",
+      role: "system",
     },
   ]);
   const [inputText, setInputText] = useState("");
@@ -65,37 +88,49 @@ const ChatWindow = () => {
   }, [messages]);
 
   // Function you can call to add bot replies programmatically
-  const addBotReply = (text) => {
+  const addBotReply = (text: string) => {
     const botMessage = {
-      id: Date.now(),
-      text: text,
-      sender: "bot",
-      timestamp: new Date(),
+      content: text,
+      role: "system",
     };
     setMessages((prev) => [...prev, botMessage]);
     setIsTyping(false);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
-    const userMessage = {
-      id: Date.now(),
-      text: inputText,
-      sender: "user",
-      timestamp: new Date(),
-    };
+    const userMessage: Message = { role: "user", content: inputText };
+    const updatedHistory = [...messages, userMessage];
+    setMessages(updatedHistory);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputText("");
-    setIsTyping(true);
-
-    // Example: Auto-reply after 1.5 seconds (you can remove this)
-    setTimeout(() => {
-      addBotReply(
-        'Thanks for your message! I received: "' + userMessage.text + '"'
-      );
-    }, 1500);
+    const docId = matchDocumentId(inputText, documents);
+    const isDocRelated = looksLikeDocQuery(inputText);
+    const nChunks = determineNumChunks(inputText);
+    try {
+      setIsTyping(true);
+      if (docId || isDocRelated) {
+        const response = await contextualSearch({
+          query: inputText,
+          chatHistory: updatedHistory,
+          documentIds: docId ? [Number(docId)] : undefined,
+          nChunks,
+        });
+        setMessages((prev) => [...prev, response.assistant]);
+      } else {
+        const response = await regularQuestion({
+          query: inputText,
+          chatHistory: updatedHistory,
+        });
+        setMessages((prev) => [...prev, response.assistant]);
+      }
+    } catch (err) {
+      setIsTyping(false);
+      console.error("Message routing failed", err);
+    } finally {
+      setInputText("");
+      setIsTyping(false);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -103,10 +138,6 @@ const ChatWindow = () => {
       e.preventDefault();
       handleSendMessage();
     }
-  };
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   return (
@@ -120,26 +151,7 @@ const ChatWindow = () => {
           py: 2,
         }}
       >
-        {/* Chat Header */}
-        <Paper
-          elevation={3}
-          sx={{
-            p: 2,
-            mb: 2,
-            background: "linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)",
-            color: "white",
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
-              <BotIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="h6">LLM Calls: </Typography>
-              <Typography variant="h6">API Calls: </Typography>
-            </Box>
-          </Box>
-        </Paper>
+        <Header />
 
         {/* Messages Container */}
         <Paper
@@ -176,11 +188,11 @@ const ChatWindow = () => {
           >
             {messages.map((message, index) => (
               <Box
-                key={message.id}
+                key={index}
                 sx={{
                   display: "flex",
                   justifyContent:
-                    message.sender === "user" ? "flex-end" : "flex-start",
+                    message.role === "user" ? "flex-end" : "flex-start",
                   mb: 2,
                   animation: "fadeInUp 0.3s ease-out",
                   "@keyframes fadeInUp": {
@@ -202,7 +214,7 @@ const ChatWindow = () => {
                     gap: 1,
                     maxWidth: "70%",
                     flexDirection:
-                      message.sender === "user" ? "row-reverse" : "row",
+                      message.role === "user" ? "row-reverse" : "row",
                   }}
                 >
                   <Avatar
@@ -210,12 +222,12 @@ const ChatWindow = () => {
                       width: 32,
                       height: 32,
                       bgcolor:
-                        message.sender === "user" ? "#1976d2" : "#ff9800",
+                        message.role === "user" ? "#1976d2" : "#ff9800",
                       transition: "transform 0.2s",
                       "&:hover": { transform: "scale(1.1)" },
                     }}
                   >
-                    {message.sender === "user" ? (
+                    {message.role === "user" ? (
                       <PersonIcon fontSize="small" />
                     ) : (
                       <BotIcon fontSize="small" />
@@ -226,11 +238,11 @@ const ChatWindow = () => {
                     sx={{
                       p: 2,
                       backgroundColor:
-                        message.sender === "user" ? "#1976d2" : "white",
+                        message.role === "user" ? "#1976d2" : "white",
                       color:
-                        message.sender === "user" ? "white" : "text.primary",
+                        message.role === "user" ? "white" : "text.primary",
                       borderRadius:
-                        message.sender === "user"
+                        message.role === "user"
                           ? "18px 18px 4px 18px"
                           : "18px 18px 18px 4px",
                       transition: "all 0.2s ease",
@@ -241,7 +253,7 @@ const ChatWindow = () => {
                     }}
                   >
                     <Typography variant="body1" sx={{ mb: 0.5 }}>
-                      {message.text}
+                      {message.content}
                     </Typography>
                     <Typography
                       variant="caption"
@@ -249,9 +261,7 @@ const ChatWindow = () => {
                         opacity: 0.7,
                         fontSize: "0.75rem",
                       }}
-                    >
-                      {formatTime(message.timestamp)}
-                    </Typography>
+                    ></Typography>
                   </Paper>
                 </Box>
               </Box>
@@ -343,7 +353,7 @@ const ChatWindow = () => {
                 maxRows={4}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Type your message..."
                 variant="outlined"
                 sx={{
@@ -406,6 +416,15 @@ const ChatWindow = () => {
         </Paper>
       </Container>
     </ThemeProvider>
+  );
+};
+
+// Main component with QueryClient provider
+const ChatWindow = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ChatWindowInner />
+    </QueryClientProvider>
   );
 };
 

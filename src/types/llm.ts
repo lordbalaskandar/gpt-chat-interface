@@ -1,4 +1,4 @@
-import { ChatHistoryRequest } from "./types";
+import { ChatHistoryRequest, Message } from "./chat";
 
 export interface SemanticQueryParams {
   query: string;
@@ -20,6 +20,23 @@ export interface LLMRegularQuestionVariables {
   developMode?: boolean;
 }
 
-export interface CallsLeftResponse {
-  calls_left: number;
+export interface Document {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface SemanticResult {
+  chunk: string;
+  title: string;
+  url: string;
+}
+
+export interface LLMResponse {
+  user: Message;
+  assistant: Message;
+}
+
+export interface LLMResponseWithContext extends LLMResponse {
+  context: string;
 }
